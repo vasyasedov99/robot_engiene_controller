@@ -38,49 +38,7 @@ encCounter encBL(OPTO_BL);
 encCounter encBR(OPTO_BR);
 bool write_counter = false;
 
-class QuadController {
-public:
-  speedKeeper* speed0;
-  speedKeeper* speed1;
-  speedKeeper* speed2;
-  speedKeeper* speed3;
-  long ms;
-  int mtimer = 50;
-  
-  QuadController(speedKeeper* s0, speedKeeper* s1, speedKeeper* s2, speedKeeper* s3) {
-    speed0 = s0;
-    speed1 = s1;
-    speed2 = s2;
-    speed3 = s3;
-    speed0.controlled = true;
-    speed1.controlled = true;
-    speed2.controlled = true;
-    speed3.controlled = true;
-  }
 
-  void tick() {
-    if (millis() - ms > mtimer) {
-      int timediff = millis() - ms;
-      ms = millis();
-
-      speed0.tick(timediff);
-      speed1.tick(timediff);
-      speed2.tick(timediff);
-      speed3.tick(timediff);
-
-      int max_difference = max(max(speed0.pos_difference, speed1.pos_difference), max(speed2.pos_difference, speed3.pos_difference));
-      speed0.target_pos -= max_difference - speed0.pos_difference;
-      speed1.target_pos -= max_difference - speed1.pos_difference;
-      speed2.target_pos -= max_difference - speed2.pos_difference;
-      speed3.target_pos -= max_difference - speed3.pos_difference;
-
-      speed0.motor_handle(timediff);
-      speed1.motor_handle(timediff);
-      speed2.motor_handle(timediff);
-      speed3.motor_handle(timediff);
-    }
-  }
-}
 
 class speedKeeper {
 public:
@@ -178,6 +136,52 @@ speedKeeper speedFL(&encFL, &motorFL);
 speedKeeper speedBR(&encBR, &motorBR);
 speedKeeper speedBL(&encBL, &motorBL);
 
+class QuadController {
+public:
+  speedKeeper* speed0;
+  speedKeeper* speed1;
+  speedKeeper* speed2;
+  speedKeeper* speed3;
+  long ms;
+  int mtimer = 50;
+  
+  QuadController(speedKeeper* s0, speedKeeper* s1, speedKeeper* s2, speedKeeper* s3) {
+    speed0 = s0;
+    speed1 = s1;
+    speed2 = s2;
+    speed3 = s3;
+    speed0->controlled = true;
+    speed1->controlled = true;
+    speed2->controlled = true;
+    speed3->controlled = true;
+  }
+
+  void tick() {
+    if (millis() - ms > mtimer) {
+      int timediff = millis() - ms;
+      ms = millis();
+
+      speed0->tick(timediff);
+      speed1->tick(timediff);
+      speed2->tick(timediff);
+      speed3->tick(timediff);
+
+      int max_difference = max(max(speed0->pos_difference, speed1->pos_difference), max(speed2->pos_difference, speed3->pos_difference));
+      speed0->target_pos -= max_difference - speed0->pos_difference;
+      speed1->target_pos -= max_difference - speed1->pos_difference;
+      speed2->target_pos -= max_difference - speed2->pos_difference;
+      speed3->target_pos -= max_difference - speed3->pos_difference;
+
+      speed0->motor_handle();
+      speed1->motor_handle();
+      speed2->motor_handle();
+      speed3->motor_handle();
+    }
+  }
+};
+
+QuadController quad_controller(&speedFR, &speedFL, &speedBR, &speedBL);
+
 void UP(){
   motorFL.setMode(FORWARD);
   motorFL.setSpeed(gain_fl);
@@ -255,6 +259,7 @@ void setup() {
 }
 
 void loop() {
+  quad_controller.tick();
   //Serial.println(encBL.update(1));
   String command = "0:1";//Serial.readStringUntil('\n');
   if (command.length() == 0) return;
