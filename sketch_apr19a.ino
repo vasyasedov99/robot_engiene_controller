@@ -43,20 +43,27 @@ public:
   encCounter *ec;
   GMotor *motor;
 
+  // motor static parameters
+  int friction = 20;
+  float power_scale = 1;
+  int tick_length = 0.01;
+
   // dynamic variables
   int speed = 0;  // current speed
+  int speed_next = 0; // calculated speed
   int ticks = 0;  // ticks from last update
   long pos = 0;   // current wheel position
-  // calculate deltas
+  // history
   int speed_history[10];
   long tick_previous = 0;
   
   // control variables
+  int gain = 0;
   int target_speed = 0;
   long target_pos = 0;
 
   // self-handling variables
-  bool controlled = true;
+  bool controlled = false;
   int mtimer = 100; // timer between engiene updates
   long ms = 0;      // time in the last update
   
@@ -78,36 +85,39 @@ public:
     
     if (!controlled)
     if (millis() - ms > mtimer) {
-      tick(millis() - ms);
+      makestep(millis() - ms);
       ms = millis();
     }
   }
 
   // tick calculating
-  void tick(mtimer) {
-      cspeed = ticks * 1000 / mtimer;
-      int pr_posdelta = (target_pos - pos);
+  void tick(int mtimer) {
+      speed = ticks * 1000 / mtimer;
       pos += ticks;
-      target_pos += target_spd * mtimer / 1000;
-      pr_posdelta = target_pos - pos - pr_posdelta;
-      ms = millis();
 
-      speed_register(cspeed);
-      prevspeed = cspeed;
+      speed_register(speed);
       ticks = 0;
   }
 
   //calculate and send motor value
   void motor_handle() {
-    motor->setSpeed(max(target_pos - pos + pr_posdelta * 0.1, 0) * 5);
+    int speed_difference = speed - speed_history[0];
+    gain = max((target_pos - pos) * 0.7 + (target_speed - speed) * 0.3, 0) * 5;
+    motor->setSpeed(gain * power_scale);
   }
 
   // make full tick with motor handle
-  void makestep() {
-    tick();
+  void makestep(int mtimer) {
+    tick(mtimer);
     motor_handle();
   }
 
+  // calculate next frame speed
+  int pos_predict(int ms) {
+    return speed * ms;
+  }
+  
+  // send speed value to the history array
   void speed_register(int speed) {
     for(int i = 9; i >= 1; i--) {
       speed_history[i] = speed_history[i - 1];
