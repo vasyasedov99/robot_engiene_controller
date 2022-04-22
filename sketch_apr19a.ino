@@ -47,34 +47,35 @@ public:
   int speed = 0;  // current speed
   int ticks = 0;  // ticks from last update
   long pos = 0;   // current wheel position
-  // dynamic control variables
+  // calculate deltas
+  int speed_history[10];
+  long tick_previous = 0;
+  
+  // control variables
   int target_speed = 0;
   long target_pos = 0;
 
   // self-handling variables
+  bool controlled = true;
   int mtimer = 100; // timer between engiene updates
   long ms = 0;      // time in the last update
-  
-  int prevspeed = 0;
-  long prevticks = 0;
-  long pos;
-
-  bool controlled = false;
   
   speedKeeper(encCounter *ec, GMotor *motor) {
     this->ec = ec;
     this->motor = motor;
     ms = millis();
   }
-  
+
+  // interface method
   void keep(int target_spd) {
     target_speed = target_spd;
     long cticks = ec->update(1);
-    if (prevticks != 0 && cticks > prevticks) {
-      ticks += cticks - prevticks;
+    if (tick_previous != 0 && cticks > tick_previous) {
+      ticks += cticks - tick_previous;
     }
     
-    prevticks = cticks;
+    tick_previous = cticks;
+    
     if (!controlled)
     if (millis() - ms > mtimer) {
       tick(millis() - ms);
@@ -82,20 +83,36 @@ public:
     }
   }
 
-  void tick() {
+  // tick calculating
+  void tick(mtimer) {
       cspeed = ticks * 1000 / mtimer;
-      int pr_cspeed = cspeed - prevspeed * mtimer / 1000 * 0.1;
       int pr_posdelta = (target_pos - pos);
-      prevspeed = cspeed;
       pos += ticks;
       target_pos += target_spd * mtimer / 1000;
       pr_posdelta = target_pos - pos - pr_posdelta;
       ms = millis();
 
-      motor->setSpeed(max(target_pos - pos + pr_posdelta * 0.1, 0) * 5);
-      //for(int i = 0; i < cspeed; i++) Serial.print("#");
-      //Serial.println(max(target_pos - pos, 0));
+      speed_register(cspeed);
+      prevspeed = cspeed;
       ticks = 0;
+  }
+
+  //calculate and send motor value
+  void motor_handle() {
+    motor->setSpeed(max(target_pos - pos + pr_posdelta * 0.1, 0) * 5);
+  }
+
+  // make full tick with motor handle
+  void makestep() {
+    tick();
+    motor_handle();
+  }
+
+  void speed_register(int speed) {
+    for(int i = 9; i >= 1; i--) {
+      speed_history[i] = speed_history[i - 1];
+    }
+    speed_history[0] = speed;
   }
 };
 speedKeeper speedFR(&encFR, &motorFR);
